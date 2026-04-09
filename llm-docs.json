@@ -1,0 +1,251 @@
+{
+  "library": "validators",
+  "version": "1.0.0",
+  "description": "Enterprise-ready, framework-agnostic validation library. Rules are plain JSON data. Supports multiple adapters (default, Zod v4). Works in Vue 2, Vue 3, Node.js. Full i18n support with code+params system.",
+  "language": "JavaScript (CommonJS, no TypeScript required)",
+  "entrypoint": "src/index.js",
+
+  "concepts": [
+    {
+      "name": "schema",
+      "description": "A plain JavaScript object (JSON-serialisable) that describes how a value should look. Contains type, rules[], nullable, optional, label, shape (for objects), items (for arrays).",
+      "example": {
+        "type": "string",
+        "rules": [{ "type": "minLength", "value": 5 }, { "type": "email" }],
+        "nullable": false,
+        "optional": false,
+        "label": "Email"
+      }
+    },
+    {
+      "name": "rule",
+      "description": "A constraint definition object: { type: string, value?: any }. The 'type' maps to a registered rule function. The 'value' is the rule parameter (e.g. minimum length).",
+      "example": { "type": "minLength", "value": 5 }
+    },
+    {
+      "name": "adapter",
+      "description": "An object with a validate(schema, value, options) method that returns an array of raw error objects { field, code, params }. The library ships with 'default' (no deps) and 'zod' (Zod v4).",
+      "contract": "{ validate(schema, value, options): Array<{ field, code, params }> }"
+    },
+    {
+      "name": "validation_result",
+      "description": "The object returned by validate(). Always contains valid (boolean) and errors (array). Never throws.",
+      "shape": {
+        "valid": "boolean",
+        "errors": "Array<{ field: string, code: string, params: object, message: string }>"
+      }
+    },
+    {
+      "name": "error_format",
+      "description": "Standard error object shape used throughout the library.",
+      "shape": {
+        "field": "Dot-notation path to the field (e.g. 'user.address.zip', '[0]', '')",
+        "code": "Error code used for i18n lookup (e.g. 'minLength', 'email', 'required')",
+        "params": "Interpolation parameters for the message template (e.g. { min: 5, actual: 2 })",
+        "message": "Translated human-readable message string"
+      }
+    },
+    {
+      "name": "i18n",
+      "description": "Localisation system based on code+params with no hardcoded messages. Supports runtime locale registration and per-call locale override. Fallback chain: requested → 'en' → code itself."
+    }
+  ],
+
+  "api": [
+    {
+      "name": "validate",
+      "signature": "validate(definition, value, options?) → { valid, errors }",
+      "description": "Main validation function. Never throws. Orchestrates buildSchema → adapter.validate → normalizeErrors → formatResult.",
+      "params": {
+        "definition": "Schema definition object (plain JS object)",
+        "value": "Any value to validate",
+        "options.locale": "Override locale for this call only",
+        "options.adapter": "Override adapter for this call only (must be registered)",
+        "options.field": "Root field name for error paths"
+      },
+      "returns": "{ valid: boolean, errors: Array<{ field, code, params, message }> }",
+      "example": "validate({ type: 'string', rules: [{ type: 'email' }] }, 'user@example.com')"
+    },
+    {
+      "name": "registerRule",
+      "signature": "registerRule(name, fn)",
+      "description": "Register a custom validation rule globally.",
+      "params": {
+        "name": "Unique rule identifier string",
+        "fn": "Rule function: (value, params) => true | { code, params }"
+      },
+      "example": "registerRule('noBadWord', (v) => v.includes('spam') ? { code: 'noBadWord', params: {} } : true)"
+    },
+    {
+      "name": "registerAdapter",
+      "signature": "registerAdapter(name, adapter)",
+      "description": "Register a validation adapter.",
+      "params": {
+        "name": "Unique adapter identifier string",
+        "adapter": "Object with validate(schema, value, options) method returning array of raw errors"
+      },
+      "example": "registerAdapter('zod', require('validators/src/adapters/zod'))"
+    },
+    {
+      "name": "setAdapter",
+      "signature": "setAdapter(name)",
+      "description": "Set the globally active adapter. Pass 'default' to revert to built-in engine.",
+      "example": "setAdapter('zod')"
+    },
+    {
+      "name": "buildSchema",
+      "signature": "buildSchema(definition) → schema",
+      "description": "Parse and normalise a schema definition. Results are cached by JSON fingerprint.",
+      "example": "const schema = buildSchema({ type: 'string', rules: [{ type: 'email' }] })"
+    },
+    {
+      "name": "setLocale",
+      "signature": "setLocale(locale)",
+      "description": "Set the globally active locale for all translations.",
+      "example": "setLocale('pt-BR')"
+    },
+    {
+      "name": "getLocale",
+      "signature": "getLocale() → string",
+      "description": "Returns the currently active locale string."
+    },
+    {
+      "name": "translate",
+      "signature": "translate(code, params, locale?) → string",
+      "description": "Translate an error code to a human-readable message. Interpolates {key} placeholders with params values.",
+      "example": "translate('minLength', { min: 5, actual: 2 }) // → 'Minimum length is 5 characters, got 2'"
+    },
+    {
+      "name": "registerLocale",
+      "signature": "registerLocale(locale, messages)",
+      "description": "Register or merge messages into a locale at runtime.",
+      "example": "registerLocale('fr', { required: 'Ce champ est requis' })"
+    },
+    {
+      "name": "clearCache",
+      "signature": "clearCache()",
+      "description": "Clear the internal schema definition cache. Useful after hot-reloading schemas."
+    }
+  ],
+
+  "rules": [
+    { "name": "required", "type": "common", "description": "Value must not be null, undefined or empty string", "params": {} },
+    { "name": "type", "type": "common", "description": "Value must match the expected JS type", "params": { "value": "string — one of: string, number, boolean, array, object, function" } },
+    { "name": "oneOf", "type": "common", "description": "Value must be one of the listed values (strict equality)", "params": { "value": "array of allowed values" } },
+    { "name": "custom", "type": "common", "description": "Inline validation function. fn(value, params) must return true/undefined (pass), false (fail), string (fail with message), or { code, params } (fail with explicit error)", "params": { "fn": "Function" } },
+    { "name": "minLength", "type": "string", "description": "String must have at least N characters", "params": { "value": "number (minimum character count)" }, "example": { "type": "minLength", "value": 5 } },
+    { "name": "maxLength", "type": "string", "description": "String must have at most N characters", "params": { "value": "number (maximum character count)" } },
+    { "name": "email", "type": "string", "description": "String must be a valid email address", "params": {} },
+    { "name": "url", "type": "string", "description": "String must be a valid HTTP/HTTPS URL", "params": {} },
+    { "name": "pattern", "type": "string", "description": "String must match the given RegExp or pattern string", "params": { "value": "RegExp or string pattern" } },
+    { "name": "notEmpty", "type": "string", "description": "String must not be blank (trimmed length > 0)", "params": {} },
+    { "name": "min", "type": "number", "description": "Number must be >= value", "params": { "value": "number (minimum)" } },
+    { "name": "max", "type": "number", "description": "Number must be <= value", "params": { "value": "number (maximum)" } },
+    { "name": "integer", "type": "number", "description": "Number must be a whole integer (no decimals)", "params": {} },
+    { "name": "positive", "type": "number", "description": "Number must be strictly greater than 0", "params": {} },
+    { "name": "negative", "type": "number", "description": "Number must be strictly less than 0", "params": {} },
+    { "name": "minItems", "type": "array", "description": "Array must have at least N elements", "params": { "value": "number (minimum items)" } },
+    { "name": "maxItems", "type": "array", "description": "Array must have at most N elements", "params": { "value": "number (maximum items)" } },
+    { "name": "noEmpty", "type": "array", "description": "Array must have at least one element", "params": {} },
+    { "name": "unique", "type": "array", "description": "All array elements must be distinct (deep equality via JSON)", "params": {} },
+    { "name": "requiredKeys", "type": "object", "description": "Object must contain all specified keys with non-null/undefined values", "params": { "value": "string[] — array of required key names" } }
+  ],
+
+  "types": ["string", "number", "boolean", "array", "object", "any"],
+
+  "adapters": [
+    {
+      "name": "default",
+      "description": "Built-in rule-based adapter. Zero external dependencies. Used automatically when no adapter is set.",
+      "module": "src/adapters/default.js",
+      "requires": []
+    },
+    {
+      "name": "zod",
+      "description": "Zod v4 adapter. Translates schema definitions to Zod schemas, runs safeParse(), maps issues to library error format.",
+      "module": "src/adapters/zod.js",
+      "requires": ["zod@^4.0.0"]
+    }
+  ],
+
+  "i18n": {
+    "description": "All error messages use a code+params system. No hardcoded strings. Fallback chain: requested locale → 'en' → raw code.",
+    "builtin_locales": ["en", "pt-BR"],
+    "how_to_change_locale": "setLocale('pt-BR')",
+    "how_to_register_locale": "registerLocale('fr', { required: 'Ce champ est requis' })",
+    "how_to_override_per_call": "validate(schema, value, { locale: 'pt-BR' })",
+    "message_format": "Templates use {key} placeholders: 'Minimum length is {min} characters, got {actual}'",
+    "error_codes": ["required", "type", "oneOf", "custom", "minLength", "maxLength", "email", "url", "pattern", "notEmpty", "min", "max", "integer", "positive", "negative", "minItems", "maxItems", "noEmpty", "unique", "requiredKeys", "shape"]
+  },
+
+  "examples": [
+    {
+      "description": "Validate a string with email rule",
+      "code": "validate({ type: 'string', rules: [{ type: 'email' }] }, 'user@example.com')",
+      "output": { "valid": true, "errors": [] }
+    },
+    {
+      "description": "Validate a string — minLength failure",
+      "code": "validate({ type: 'string', rules: [{ type: 'minLength', value: 5 }] }, 'abc')",
+      "output": { "valid": false, "errors": [{ "field": "", "code": "minLength", "params": { "min": 5, "actual": 3 }, "message": "Minimum length is 5 characters, got 3" }] }
+    },
+    {
+      "description": "Validate an object with shape",
+      "code": "validate({ type: 'object', shape: { name: { type: 'string', rules: [{ type: 'minLength', value: 2 }] }, email: { type: 'string', rules: [{ type: 'email' }] } } }, { name: 'Alice', email: 'alice@example.com' })",
+      "output": { "valid": true, "errors": [] }
+    },
+    {
+      "description": "Validate an array with item schema",
+      "code": "validate({ type: 'array', rules: [{ type: 'minItems', value: 1 }], items: { type: 'string', rules: [{ type: 'email' }] } }, ['bad-email'])",
+      "output": { "valid": false, "errors": [{ "field": "[0]", "code": "email", "params": {}, "message": "Must be a valid email address" }] }
+    },
+    {
+      "description": "Change locale and get translated message",
+      "code": "setLocale('pt-BR'); validate({ type: 'string', rules: [{ type: 'email' }] }, 'bad')",
+      "output": { "valid": false, "errors": [{ "field": "", "code": "email", "params": {}, "message": "Deve ser um endereço de e-mail válido" }] }
+    },
+    {
+      "description": "Dynamic schema from API",
+      "code": "const schema = await fetch('/api/schema').then(r => r.json()); validate(schema, value)",
+      "note": "Schema is a plain object — fetch result works directly"
+    },
+    {
+      "description": "Register and use Zod v4 adapter",
+      "code": "const zodAdapter = require('validators/src/adapters/zod'); registerAdapter('zod', zodAdapter); validate(schema, value, { adapter: 'zod' })",
+      "note": "Requires zod package installed"
+    },
+    {
+      "description": "Custom inline rule",
+      "code": "validate({ type: 'string', rules: [{ type: 'custom', fn: (v) => v.startsWith('BR') || 'Must start with BR' }] }, 'US-123')",
+      "output": { "valid": false, "errors": [{ "code": "custom", "message": "Must start with BR" }] }
+    },
+    {
+      "description": "Nullable field",
+      "code": "validate({ type: 'string', nullable: true, rules: [{ type: 'email' }] }, null)",
+      "output": { "valid": true, "errors": [] }
+    },
+    {
+      "description": "Optional field",
+      "code": "validate({ type: 'string', optional: true }, undefined)",
+      "output": { "valid": true, "errors": [] }
+    }
+  ],
+
+  "extension_points": {
+    "custom_rule": "registerRule(name, fn) — fn: (value, params) => true | { code, params }",
+    "custom_adapter": "registerAdapter(name, { validate(schema, value, options): rawErrors[] })",
+    "custom_locale": "registerLocale(locale, { code: 'Template with {param} placeholders' })"
+  },
+
+  "security": {
+    "never_throws": true,
+    "handles_null": true,
+    "handles_undefined": true,
+    "handles_NaN": true,
+    "handles_invalid_schema": true,
+    "note": "validate() wraps all execution in try/catch and always returns { valid, errors }"
+  },
+
+  "generated_at": "2026-04-09",
+  "mcp_intent": "This file enables AI assistants and LLMs to understand how to use, extend and reason about this library. It contains the full API surface, all rules with parameters and examples, i18n instructions and extension patterns."
+}

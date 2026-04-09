@@ -1,0 +1,23 @@
+{
+  "name": "validators",
+  "version": "1.0.0",
+  "description": "Enterprise-ready, framework-agnostic validation library with i18n and adapter support",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "keywords": ["validation", "schema", "i18n", "validator", "zod"],
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "zod": "^4.0.0"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": { "optional": true }
+  }
+}
