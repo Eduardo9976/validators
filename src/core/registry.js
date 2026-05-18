@@ -5,6 +5,7 @@ const numberRules = require('../rules/number')
 const arrayRules = require('../rules/array')
 const objectRules = require('../rules/object')
 const commonRules = require('../rules/common')
+const defaultAdapter = require('../adapters/default')
 
 const _rules = new Map()
 const _adapters = new Map()
@@ -24,7 +25,12 @@ function _initBuiltinRules() {
   }
 }
 
+function _initBuiltinAdapters() {
+  _adapters.set('default', defaultAdapter)
+}
+
 _initBuiltinRules()
+_initBuiltinAdapters()
 
 /**
  * Register a custom validation rule.
@@ -58,10 +64,10 @@ function registerAdapter(name, adapter) {
 
 /**
  * Set which adapter is used by default for all validate() calls.
- * @param {string} name - Must match a previously registered adapter, or "default"
+ * @param {string} name - Must match a previously registered adapter
  */
 function setAdapter(name) {
-  if (name !== 'default' && !_adapters.has(name)) {
+  if (!_adapters.has(name)) {
     throw new Error(`[validators] setAdapter: adapter "${name}" is not registered`)
   }
   _activeAdapter = name
@@ -98,6 +104,7 @@ function _reset() {
   _adapters.clear()
   _activeAdapter = 'default'
   _initBuiltinRules()
+  _initBuiltinAdapters()
 }
 
 module.exports = {

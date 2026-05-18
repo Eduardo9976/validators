@@ -1,7 +1,12 @@
 'use strict'
 
-const { getRule } = require('../core/registry')
 const { buildSchema } = require('../core/schema-builder')
+
+// Lazy lookup avoids the registry ↔ default-adapter circular import.
+// Node caches the module after the first require, so cost is negligible.
+function getRule(name) {
+  return require('../core/registry').getRule(name)
+}
 
 /**
  * Recursively validate a value against a normalised schema using built-in rules.

@@ -30,15 +30,18 @@ function buildZodSchema(schema) {
     case 'string':
       s = z.string()
       for (const rule of schema.rules) s = applyStringRule(s, rule)
+      for (const rule of schema.rules) s = applyCommonRule(s, rule)
       break
 
     case 'number':
       s = z.number()
       for (const rule of schema.rules) s = applyNumberRule(s, rule)
+      for (const rule of schema.rules) s = applyCommonRule(s, rule)
       break
 
     case 'boolean':
       s = z.boolean()
+      for (const rule of schema.rules) s = applyCommonRule(s, rule)
       break
 
     case 'array': {
@@ -78,7 +81,28 @@ function applyStringRule(s, rule) {
     case 'email':     return s.email()
     case 'url':       return s.url()
     case 'pattern':   return s.regex(rule.value instanceof RegExp ? rule.value : new RegExp(rule.value))
+    case 'notEmpty':  return s.refine((v) => typeof v === 'string' && v.trim().length > 0, { params: { __code: 'notEmpty' } })
     default:          return s
+  }
+}
+
+function applyCommonRule(s, rule) {
+  switch (rule.type) {
+    case 'oneOf': {
+      const values = Array.isArray(rule.value) ? rule.value : Array.isArray(rule.values) ? rule.values : []
+      return s.refine((v) => values.includes(v), { params: { __code: 'oneOf', values: values.join(', ') } })
+    }
+    case 'custom': {
+      if (typeof rule.fn !== 'function') return s
+      return s.refine(
+        (v) => {
+          const r = rule.fn(v, rule)
+          return r === true || r === undefined || r === null
+        },
+        { params: { __code: 'custom' } }
+      )
+    }
+    default: return s
   }
 }
 
@@ -107,8 +131,7 @@ function applyArrayRule(s, rule) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function mapIssueCode(issue) {
-  // Zod v4 uses `origin`, v3 used `type`
-  const origin = issue.origin || issue.type
+  const origin = issue.origin
   switch (issue.code) {
     case 'too_small':
       if (origin === 'string') return 'minLength'
@@ -120,55 +143,60 @@ function mapIssueCode(issue) {
       return 'max'
     case 'invalid_type':
       return issue.received === 'undefined' ? 'required' : 'type'
-    // Zod v3 string code
-    case 'invalid_string':
-      if (issue.validation === 'email') return 'email'
-      if (issue.validation === 'url')   return 'url'
-      if (issue.validation === 'regex') return 'pattern'
-      return 'pattern'
-    // Zod v4 string code
     case 'invalid_format':
       if (issue.format === 'email') return 'email'
       if (issue.format === 'url')   return 'url'
-      if (issue.format === 'regex') return 'pattern'
       return 'pattern'
+    case 'custom': {
+      const code = issue.params && issue.params.__code
+      return code || 'custom'
+    }
     default:
       return 'custom'
   }
 }
 
+function actualSize(input) {
+  if (typeof input === 'string') return input.length
+  if (Array.isArray(input)) return input.length
+  return input
+}
+
 function mapIssueParams(issue) {
-  const inputLen =
-    typeof issue.input === 'string'
-      ? issue.input.length
-      : Array.isArray(issue.input)
-      ? issue.input.length
-      : issue.input
+  const inputLen = actualSize(issue.input)
 
   switch (issue.code) {
     case 'too_small':
-      // Zod v4 uses `minimum`, v3 also uses `minimum`
-      return { min: issue.minimum != null ? issue.minimum : (issue.min != null ? issue.min : undefined), actual: inputLen }
+      return { min: issue.minimum, actual: inputLen }
     case 'too_big':
-      return { max: issue.maximum != null ? issue.maximum : (issue.max != null ? issue.max : undefined), actual: inputLen }
+      return { max: issue.maximum, actual: inputLen }
     case 'invalid_type':
       return { expected: issue.expected, actual: issue.received }
+    case 'custom': {
+      if (issue.params && issue.params.__code === 'oneOf') {
+        return { values: issue.params.values }
+      }
+      return {}
+    }
     default:
       return {}
   }
 }
 
+function joinPath(prefix, path) {
+  if (path.length === 0) return prefix
+  const joined = path.join('.')
+  if (!prefix) return joined
+  return `${prefix}.${joined}`
+}
+
 function normalizeZodErrors(zodError, field) {
   const prefix = field || ''
-  return zodError.issues.map((issue) => {
-    const path =
-      issue.path.length > 0
-        ? prefix
-          ? `${prefix}.${issue.path.join('.')}`
-          : issue.path.join('.')
-        : prefix
-    return { field: path, code: mapIssueCode(issue), params: mapIssueParams(issue) }
-  })
+  return zodError.issues.map((issue) => ({
+    field: joinPath(prefix, issue.path),
+    code: mapIssueCode(issue),
+    params: mapIssueParams(issue),
+  }))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

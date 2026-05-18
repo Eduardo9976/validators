@@ -12,7 +12,7 @@
   "license": "MIT",
   "devDependencies": {
     "jest": "^29.0.0",
-    "zod": "^4.0.0"
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "zod": "^4.0.0"

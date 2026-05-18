@@ -232,6 +232,40 @@ describe('Zod v4 adapter — field paths', () => {
   })
 })
 
+// ─── Common rules (oneOf, notEmpty, custom) routed through Zod refinements ───
+
+describe('Zod v4 adapter — common rules', () => {
+  test('notEmpty fails whitespace-only string', () => {
+    const r = call({ type: 'string', rules: [{ type: 'notEmpty' }] }, '   ')
+    expect(r.valid).toBe(false)
+    expect(r.errors[0].code).toBe('notEmpty')
+  })
+
+  test('notEmpty passes non-blank string', () => {
+    expect(call({ type: 'string', rules: [{ type: 'notEmpty' }] }, 'hi').valid).toBe(true)
+  })
+
+  test('oneOf fails when value not in list', () => {
+    const r = call({ type: 'string', rules: [{ type: 'oneOf', value: ['a', 'b'] }] }, 'x')
+    expect(r.valid).toBe(false)
+    expect(r.errors[0].code).toBe('oneOf')
+    expect(r.errors[0].params.values).toContain('a')
+  })
+
+  test('oneOf passes when value matches', () => {
+    expect(call({ type: 'string', rules: [{ type: 'oneOf', value: ['a', 'b'] }] }, 'a').valid).toBe(true)
+  })
+
+  test('custom rule failure surfaces with custom code', () => {
+    const r = call(
+      { type: 'string', rules: [{ type: 'custom', fn: (v) => v === 'ok' }] },
+      'bad'
+    )
+    expect(r.valid).toBe(false)
+    expect(r.errors[0].code).toBe('custom')
+  })
+})
+
 // ─── Global default adapter ───────────────────────────────────────────────────
 
 describe('Zod adapter as global default', () => {

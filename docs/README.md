@@ -70,7 +70,7 @@ Uma **definição de schema** é um objeto JavaScript simples (JSON-serializáve
   ],
   nullable: false,         // aceita null?
   optional: false,         // aceita undefined?
-  label: 'E-mail',         // rótulo (para uso futuro)
+  label: 'E-mail',         // rótulo opcional (metadata; pass-through para apps e adapters)
 }
 ```
 
@@ -90,8 +90,8 @@ Uma **rule** é um par `{ type, value? }` que especifica uma constraint:
 ### Adapter
 
 Um **adapter** é quem executa a validação. A biblioteca vem com:
-- `default` — engine própria, zero dependências
-- `zod` — usa Zod v4 internamente (requer `npm install zod`)
+- `default` — engine própria, zero dependências, suporte completo a todas as regras embutidas
+- `zod` — usa Zod v4 internamente (requer `npm install zod`); mapeia todas as regras embutidas (incluindo `notEmpty`, `oneOf`, `custom`) via `refine()` quando não há equivalente nativo
 
 ### Resultado de validação
 
@@ -324,6 +324,7 @@ validate(
 ## Performance
 
 - Schemas são **cacheados por fingerprint JSON** — múltiplas chamadas com o mesmo objeto são gratuitas após a primeira
+- Cache é **limitado a 1.000 entradas** (eviction FIFO) — sem risco de leak de memória em serviços long-running com schemas dinâmicos
 - 1.000 validações de string: < 200ms
 - 1.000 validações de objeto com 3 campos: < 500ms
 

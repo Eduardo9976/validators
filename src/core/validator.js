@@ -5,7 +5,6 @@ const { getAdapter, getActiveAdapterName } = require('./registry')
 const { normalizeErrors } = require('../error/normalizer')
 const { formatResult } = require('../error/format')
 const { getLocale } = require('../i18n/index')
-const defaultAdapter = require('../adapters/default')
 
 /**
  * Validate a value against a schema definition.
@@ -29,16 +28,11 @@ function validate(definition, value, options) {
     const locale = opts.locale || getLocale()
     const adapterName = opts.adapter || getActiveAdapterName()
 
-    let rawErrors
-    if (adapterName === 'default') {
-      rawErrors = defaultAdapter.validate(schema, value, opts)
-    } else {
-      const adapter = getAdapter(adapterName)
-      if (!adapter) {
-        throw new Error(`[validators] Adapter "${adapterName}" is not registered`)
-      }
-      rawErrors = adapter.validate(schema, value, opts)
+    const adapter = getAdapter(adapterName)
+    if (!adapter) {
+      throw new Error(`[validators] Adapter "${adapterName}" is not registered`)
     }
+    const rawErrors = adapter.validate(schema, value, opts)
 
     const normalized = normalizeErrors(rawErrors, locale)
     return formatResult(normalized)

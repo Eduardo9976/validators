@@ -70,4 +70,18 @@ describe('buildSchema()', () => {
     const schema = buildSchema({})
     expect(schema.type).toBe('any')
   })
+
+  test('cache is bounded — evicts oldest entry past the cap', () => {
+    // Build many distinct schemas to overflow the 1000-entry cap and confirm
+    // the first inserted entry no longer maps to the same cached reference.
+    const firstDef = { type: 'string', rules: [{ type: 'minLength', value: 0 }] }
+    const firstSchema = buildSchema(firstDef)
+
+    for (let i = 1; i < 1001; i++) {
+      buildSchema({ type: 'string', rules: [{ type: 'minLength', value: i }] })
+    }
+
+    const firstAgain = buildSchema(firstDef)
+    expect(firstAgain).not.toBe(firstSchema) // evicted → new object built
+  })
 })
