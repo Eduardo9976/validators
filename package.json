@@ -3,6 +3,13 @@
   "version": "1.0.0",
   "description": "Enterprise-ready, framework-agnostic validation library with i18n and adapter support",
   "main": "src/index.js",
+  "files": [
+    "src/",
+    "docs/",
+    "LICENSE",
+    "README.md",
+    "llm-docs.json"
+  ],
   "scripts": {
     "test": "jest",
     "test:coverage": "jest --coverage",
